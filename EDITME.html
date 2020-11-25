@@ -1,0 +1,355 @@
+Life is social. Apps should be social too. But too often, apps for Android devices keep to themselves in terms of features and content.
+
+This is often a good thing; in this age of targeted native advertising, consumer information leaks, and government surveillance, users value all the privacy they can get. But given informed consent to data being shared among apps, what's the best way to provide that data?
+
+Enter <strong>Content Providers</strong>, Android's way for apps to provide structured data to each other.
+
+<h3>Getting started</h3>
+
+You'll need two sample apps to demonstrate the capabilities of Content Providers. The first app, <strong>Planet Provider</strong>, wraps around a SQLite database of moons and planets, and the latitudes and longitudes of rebel bases on those moons and planets.
+
+Download the Planet Provider starter app and run the app on an emulator. Open the Android Monitor in Android Studio in order to read the log outputs and filter for the string <code>test</code>.
+
+When the app opens, you can read in the logs that the app is reading the included SQLite database and printing the contents. Currently that data is only readable inside the PlanetProver app, so next you'll add a Content Provider to export the information.
+
+<h2>Creating the Content provider</h2>
+
+Create a new class by right-clicking on <strong>app/java/com.razeware.planetprovider</strong> in Android Studio and selecting <strong>New > Kotlin File/Class</strong>. Call it <em>PlanetContentProvider</em>.
+
+Next, edit the class signature so it extends <code>ContentProvider</code>:
+
+<pre lang="kotlin">
+class PlanetContentProvider : ContentProvider {
+}
+</pre>
+
+Extending <code>ContentProvider</code> requires you to implement several methods, so single-click on the class name, press <em>option+Enter</em>, and select <em>Implement methods</em> to easily create the method stubs.
+
+We use the first method, <code>onCreate()</code>, to create an instance of <code>DBHelper</code>, which will help you quickly access the SQLite database included with the app. Create an instance variable for the DBHelper and initialise it with the context in <code>onCreate()</code> like below:
+
+<pre lang="kotlin">
+lateinit private var dbHelper: DBHelper
+
+override fun onCreate(): Boolean {
+    this.dbHelper = DBHelper()
+    return true
+}
+</pre>
+
+The next method to implement is <code>query()</code>. Your consumer app will call this method to request data from the content provider. You have a chance to interpret the consumer's request and return the appropriate data, if any.
+
+This brings up an important point-- the underlying data doesn't have to be in a SQLite datbase as in this example. We can store the data in a file, in a remote server, or however you like. The Content Provider implementation simply serves as a simplifying interface for consumers.
+
+For convenience, create an instance variable for the database that the DBHelper will load at the top of the class:
+
+<pre lang="kotlin">
+lateinit private var db: SQLiteDatabase
+</pre>
+
+Then, tell the DBHelper to get your readable SQLite database, and query for the ID numbers and names of planets in the database:
+
+<pre lang="kotlin">
+  override fun query(uri: Uri, projection: Array<String>, selection: String?, selectionArgs: Array<String>, sortOrder: String): Cursor {
+    this.db = dbHelper.readableDatabase
+    if (selection != null) {
+      return this.db.rawQuery("select id as _id, name from planets where " + selection, arrayOf<String>())
+    } else {
+      return this.db.rawQuery("select id as _id, name from planets", arrayOf<String>())
+    }
+  }
+</pre>
+
+After obtaining a reference to the database, you check if the user has submitted any selection criteria (for example, a specific planet or moon name). You return the results of the query and the consumer will take it from there.
+
+<div class="note">Note that ID number has to be formatted specifically as <code>_id</code>, just as a Content Provider requirement.</div>
+
+Also, note that you aren't returning the locations of the rebel bases because that is sensitive information and you don't want any old app to have that. However, you'll see shortly that the information is still accessible through a security loophole.
+
+Just as Activities are declared in your app's Manifest, Content Providers must be declared and given a few important attributes. So open up your <strong>AndroidManifest.xml</strong> and add the following element inside the <code>application</code> element:
+
+<pre lang="xml">
+<provider
+    android:name=".PlanetContentProvider"
+    android:authorities="com.razeware.planetprovider"
+    android:exported="true">
+</provider>
+</pre>
+
+<ul>
+<li>
+The <code>name</code> attribute simply specifies the class you just created.
+</li>
+<li>
+The <code>authority</code> attribute is a string that consumers will use to request data from the Content Provider.
+</li>
+<li>
+Marking the provider as <code>exported</code> means other apps can access the data.
+</li>
+</ul>
+
+And with that, you've set up a simple Content Provider! Time to consume the data inside another app...
+
+<h2>Setting up the Planet Consumer App</h2>
+
+The second app in this tutorial is called <strong>Planet Consumer</strong>, and it will be interacting with PlanetProvider to query, insert, and update data about the planets and rebel bases.
+
+Download the PlanetConsumer starter app and run the app on an emulator. It will just show an EditText and a Button for now, and nothing else. There is also a ListView underneath the first two elements, but it is empty for now.
+
+So first up, you need a way to query the planet names from the Content Provider in the provider app. This requires specifying the authority used in the provider's manifest.
+
+Find the instance variable <code>Uri URI</code> at the top of <code>MainActivity</code>, and replace it with this:
+
+<pre lang="kotlin">
+var uri = Uri.parse("content://com.razeware.planetprovider")
+</pre>
+
+The first part of the URI is always <code>content://</code>, followed by the authority identifier.
+
+Next, scroll down to the method named <code>refresh_name_table()</code>. This method is called when the Activity opens and you'll do your query in here.
+
+Place this code inside the method:
+
+<pre lang=kotlin">
+private fun refresh_name_table() {
+  cursor = contentResolver.query(nameUri, null, null, null, null)
+
+  if (cursor != null) {
+    listView.adapter = SimpleCursorAdapter(this,
+      android.R.layout.simple_list_item_1,
+      cursor,
+      arrayOf("name"),
+      intArrayOf(android.R.id.text1)
+    )
+  }
+}
+</pre>
+
+First, you create and send a query at the specified URI, and assign the results to a Cursor. If the cursor is not null, then you use the handy <code>SimpleCursorAdapter</code> to
+
+<img src="https://www.raywenderlich.com/wp-content/uploads/2016/05/Screenshot_20160510-132658.png" alt="Screenshot_20160510-132658" width="1080" height="1920" class="aligncenter size-full wp-image-134006" />
+
+<h2>Locating the rebel bases</h2>
+
+As your provider is set up now, it is actually possible for your consumer app to hack its way into the locations of the rebel bases. Uh oh!
+
+While the consumer can't query for the base locations directly, what it <em>can</em> do is sneak guesses at the base location into the WHERE clause of normal queries, over and over until it finds the right answer.
+
+In PlanetConsumer's MainActivity, take a look at the method <code>hackToFindRebelBaseWithQuery()</code>. Inside are two searches: one for the base latitude and one for the base longitude. After the searches are finished, they display a Toast on the phone and log to the Android Monitor the location of the rebel base on a certain planet or moon.
+
+To try it out, find the <code>// TODO</code> inside the <code>onClick()</code> method connected to the Button. Replace the <code>// TODO</code> with a call to <code>hackToFindRebelBaseWithQuery()</code>
+
+<pre lang="kotlin">
+button.setOnClickListener(View.OnClickListener {
+    hackToFindRebelBaseWithQuery()
+})
+</pre>
+
+<img src="https://www.raywenderlich.com/wp-content/uploads/2016/05/Screenshot_20160510-134754-281x500.png" alt="Screenshot_20160510-134754" width="281" height="500" class="aligncenter size-large wp-image-134008" />
+
+<h2>Manifest Permissions</h2>
+
+Clearly, you have to lock down your content more. Even though the Content Provider makes no mention of rebel base locations, the consumer was able to figure them out since the underlying SQL database contains them.
+
+There are a few approaches to <code>Content Provider</code> security. The first note is pretty universal-- don't allow user input directly into your SQL statements.
+
+The second is to implement <strong>Permissions</strong. Right now, any consumer app has full access to call any method in your content provider. By defining a required permission in your provider, you can make sure consumer apps ask for the right permissions.
+
+Open <strong>AndroidManifest.xml</strong> in PlanetProvider. Find the <code>provider</code> element and add the following:
+
+<pre lang="java">
+<provider
+    android:name=".PlanetContentProvider"
+    android:authorities="com.razeware.planetprovider"
+    android:exported="true"
+    android:permission="com.razeware.planetprovider.NAMES">
+</pre>
+
+It's not required, but a good practice to include the namespace for your app in your permission names so it is always obvious where the permission is from.
+
+The permission you just added allows both reading and writing with your content provider. Without it, interactions with the provider are blocked.
+
+To see this in action, Build and Run PlanetProvider to load an APK with the updated Manifest to your device. Then, Build and Run PlanetConsumer. Your app will crash as soon as it tries to read the planet names, and a check of the Android Monitor gives the message:
+
+<pre lang="java">
+java.lang.SecurityException: Permission Denial: opening provider com.razeware.planetprovider.PlanetContentProvider from ... requires com.razeware.planetprovider.NAMES or com.razeware.planetprovider.NAMES
+</pre>
+
+<div class="note"><strong>Note:</strong> You may have to Uninstall the apps before the Build and Run to get permission changes to take effect. This applies to the rest of the permission-related instructions to come as well.</div>
+
+As the error message indicates, you need to add the provider's permission to the manifest of PlanetConsumer. This should be familiar, as you've likely specified permissions for an Android app into your Android Manifest before, in order to use the camera or access the Internet for example.
+
+Open PlanetConsumer's AndroidManfiest.xml and add the following lines:
+
+<pre lang="kotlin">
+<permission android:name="com.razeware.planetprovider.NAMES"/>
+<uses-permission android:name="com.razeware.planetprovider.NAMES"/>
+<uses-permission-sdk-23 android:name="com.razeware.planetprovider.NAMES"/>
+</pre>
+
+Build and Run PlanetConsumer again, and you will see your data loading again like normal.
+
+<h2>Read and Write Permissions</h2>
+
+The permission you implemented allows both reading and writing with your content provider. If you want to separate reading and writing permissions, or disallow one of the two, you can specify permissions separately.
+
+Add these two lines to the <code>provider</code> element in PlanetProducer's AndroidManifest.xml:
+
+<pre lang="xml">
+<provider
+    android:name=".PlanetContentProvider"
+    android:authorities="com.razeware.planetprovider"
+    android:exported="true"
+    android:permission="com.razeware.planetprovider.NAMES"
+    android:readPermission="com.razeware.planetprovider.READ_NAMES"
+    android:writePermission="com.razeware.planetprovider.WRITE_NAMES">
+</pre>
+
+The previous permission is now overridden by the read and write specific permissions.
+
+To implement the permissions in PlanetConsumer, replace the current permission in the manifest with these:
+
+<pre lang="xml">
+<permission android:name="com.razeware.planetprovider.READ_NAMES"/>
+<uses-permission android:name="com.razeware.planetprovider.READ_NAMES"/>
+<uses-permission-sdk-23 android:name="com.razeware.planetprovider.READ_NAMES"/>
+
+<permission android:name="com.razeware.planetprovider.WRITE_NAMES"/>
+<uses-permission android:name="com.razeware.planetprovider.WRITE_NAMES"/>
+<uses-permission-sdk-23 android:name="com.razeware.planetprovider.WRITE_NAMES"/>
+</pre>
+
+The <code>uses-permission-sdk-23</code> tag applies to devices running Android SDK version 23. Android's documentation has more information if you're interested.
+
+One final note here: even if a consumer doesn't implement a read permission, they may still be able to obtain sensitive data by doing a similar hack to before, by including guesses into the WHERE clause of an update SQL statement.
+
+In MainActivity of PlanetConsumer, <strong>hackToFindRebelBaseWithUpdate()</strong> displays how to do this. Put it into the listener for the button like so:
+
+<pre lang="swift">
+button.setOnClickListener(View.OnClickListener {
+    hackToFindRebelBaseWithUpdate()
+})
+</pre>
+
+<h2>Paths and Path Permissions</h2>
+
+Another way to specify permissions is to define URI paths and have different permissions apply to different paths.
+
+To create URI paths for this project, add a companion object to the top of <code>PlanetContentProvider</code> in PlanetProvider:
+
+<pre lang="kotlin">
+companion object {
+  val NAME_CODE = 10
+  val REBEL_BASE_CODE = 20
+
+  val AUTHORITY = "com.razeware.planetprovider"
+  val NAME_PATH = "name"
+  val REBEL_BASE_PATH = "rebel_base"
+
+  val uriMatcher = UriMatcher(UriMatcher.NO_MATCH)
+
+  init {
+    uriMatcher.addURI(AUTHORITY, NAME_PATH, NAME_CODE);
+    uriMatcher.addURI(AUTHORITY, REBEL_BASE_PATH, REBEL_BASE_CODE);
+  }
+}
+</pre>
+
+Here, you have set up a <code>UriMatcher</code> to perform a pretty basic task: given a certain incoming URI, the UriMatcher will return either the integer associated with <code>NAME_CODE</code> or <code>REBEL_BASE_CODE</code>.
+
+The incoming URI will be in the same format as used earlier, just with a last "path" String appended at the end. For example, what was:
+
+<pre lang="kotlin">
+content://com.razeware.planetprovider
+</pre>
+
+is now either:
+
+<pre lang="kotlin">
+content://com.razeware.planetprovider/name
+</pre>
+
+or:
+
+<pre lang="kotlin">
+content://com.razeware.planetprovider/rebel_base
+</pre>
+
+This enables you to easily put <code>when</code> statements into your content provider to perform tasks differently based on URI. To see this in action, change the implementation of <code>query()</code> to this:
+
+<pre lang="kotlin">
+override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor {
+  this.db = dbHelper.readableDatabase
+
+  when (uriMatcher.match(uri)) {
+    NAME_CODE -> return this.db.rawQuery("select id as _id, name from planets", arrayOf<String>())
+    REBEL_BASE_CODE -> return this.db.rawQuery("select id as _id, name, rebel_base_lat, rebel_base_lng from planets", arrayOf<String>())
+    else -> throw IllegalArgumentException("Unknown URI: " + uri)
+  }
+}
+</pre>
+
+Now, your query implementation can vary based on the incoming URI. The name URI returns only the IDs and planet names, while the rebel base URI returns all the information.
+
+As you can imagine, you would only want some apps to be able to use the rebel base URI. To set separate permissions, head over to AndroidManifest.xml in PlanetProvider and add the following to the <code>provider</code> element:
+
+<pre lang="xml">
+<provider
+    android:name=".PlanetContentProvider"
+    android:authorities="com.razeware.planetprovider"
+    android:exported="true">
+  <path-permission
+      android:pathPattern="/name"
+      android:readPermission="com.razeware.planetprovider.READ_NAMES" />
+  <path-permission
+      android:pathPattern="/rebel_base"
+      android:readPermission="com.razeware.planetprovider.WRITE_BASES" />
+</provider>
+</pre>
+
+Now, your provider requires different permissions for reading with different URI paths.
+
+To implement the new requirements, head on over to the AndroidManifest.xml for PlanetConsumer, and specify the two new permissions. This should look pretty familiar by now:
+
+<pre lang="xml">
+<permission android:name="com.razeware.planetprovider.READ_NAMES"/>
+<uses-permission android:name="com.razeware.planetprovider.READ_NAMES"/>
+<uses-permission-sdk-23 android:name="com.razeware.planetprovider.READ_NAMES"/>
+
+<permission android:name="com.razeware.planetprovider.WRITE_BASES"/>
+<uses-permission android:name="com.razeware.planetprovider.WRITE_BASES"/>
+<uses-permission-sdk-23 android:name="com.razeware.planetprovider.WRITE_BASES"/>
+</pre>
+
+Then, open MainActivity in PlanetConsumer and place these two properties at the top of the class:
+
+<pre lang="kotlin">
+  var nameUri = Uri.withAppendedPath(URI, "name")
+  var rebelBaseUri = Uri.withAppendedPath(URI, "rebel_base")
+</pre>
+
+Now you can use one of these URIs instead of the base URI to query for data. For example, replace the reference to URI to nameUri in refresh_name_table():
+
+<pre lang="kotlin">
+private fun refresh_name_table() {
+  cursor = contentResolver.query(nameUri, null, null, null, null)
+
+  if (cursor != null) {
+    listView.adapter = SimpleCursorAdapter(this,
+        android.R.layout.simple_list_item_1,
+        cursor,
+        arrayOf("name"),
+        intArrayOf(android.R.id.text1)
+    )
+  }
+}
+</pre>
+
+Build and Run, and your app will use the new permissions and URIs to query for planet and moon names.
+
+<h2>Where to Go From Here?</h2>
+
+This tutorial served as a basic introduction to Android's Content Providers. They are convenient ways to communicate, but beware of all the security and permission risks involved with sensitive data. Remember to not allow SQL injection and to implement strict permissions for your provider.
+
+For more security tips for Content Providers not covered here, please see Android's documentation on the subject. You don't want your users to be the victims of hacking.
+
+Other common uses for Content Providers include sharing Calendar events and Contacts lists.
