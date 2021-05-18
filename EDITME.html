@@ -6,11 +6,11 @@ Enter <strong>Content Providers</strong>, Android's way for apps to provide stru
 
 <h3>Getting started</h3>
 
-You'll need two sample apps to demonstrate the capabilities of Content Providers. The first app, <strong>Planet Provider</strong>, wraps around a SQLite database of moons and planets, and the latitudes and longitudes of rebel bases on those moons and planets.
+We'll need two sample apps to demonstrate the capabilities of Content Providers. The first app, <strong>Planet Provider</strong>, wraps around a SQLite database of moons and planets, and the latitudes and longitudes of rebel bases on those moons and planets.
 
-Download the Planet Provider starter app and run the app on an emulator. Open the Android Monitor in Android Studio in order to read the log outputs and filter for the string <code>test</code>.
+Download the Planet Provider starter app and run the app on an emulator. Go to the Logcat tab in Android Studio in order to read the log outputs and filter for the string <code>test</code>.
 
-When the app opens, you can read in the logs that the app is reading the included SQLite database and printing the contents. Currently that data is only readable inside the PlanetProver app, so next you'll add a Content Provider to export the information.
+When the app opens, we can read in the logs that the app is reading the included SQLite database and printing the contents. Currently that data is only readable inside the PlanetProver app, so next we'll add a Content Provider to export the information.
 
 <h2>Creating the Content provider</h2>
 
@@ -49,7 +49,7 @@ lateinit private var db: SQLiteDatabase
 Then, tell the DBHelper to get your readable SQLite database, and query for the ID numbers and names of planets in the database:
 
 <pre lang="kotlin">
-  override fun query(uri: Uri, projection: Array<String>, selection: String?, selectionArgs: Array<String>, sortOrder: String): Cursor {
+  override fun query(uri: Uri, projection: Array<String>, selection: String?, selectionArgs: Array<String>, sortOrder: String?): Cursor {
     this.db = dbHelper.readableDatabase
     if (selection != null) {
       return this.db.rawQuery("select id as _id, name from planets where " + selection, arrayOf<String>())
@@ -118,7 +118,8 @@ private fun refresh_name_table() {
       android.R.layout.simple_list_item_1,
       cursor,
       arrayOf("name"),
-      intArrayOf(android.R.id.text1)
+      intArrayOf(android.R.id.text1),
+      0
     )
   }
 }
@@ -126,7 +127,7 @@ private fun refresh_name_table() {
 
 First, you create and send a query at the specified URI, and assign the results to a Cursor. If the cursor is not null, then you use the handy <code>SimpleCursorAdapter</code> to
 
-<img src="https://www.raywenderlich.com/wp-content/uploads/2016/05/Screenshot_20160510-132658.png" alt="Screenshot_20160510-132658" width="1080" height="1920" class="aligncenter size-full wp-image-134006" />
+<img src="https://koenig-media.raywenderlich.com/uploads/2021/05/Screenshot_1621316967.png" alt="Screenshot_1621316967" width="1080" height="1920" class="aligncenter size-full wp-image-134006" />
 
 <h2>Locating the rebel bases</h2>
 
@@ -134,7 +135,7 @@ As your provider is set up now, it is actually possible for your consumer app to
 
 While the consumer can't query for the base locations directly, what it <em>can</em> do is sneak guesses at the base location into the WHERE clause of normal queries, over and over until it finds the right answer.
 
-In PlanetConsumer's MainActivity, take a look at the method <code>hackToFindRebelBaseWithQuery()</code>. Inside are two searches: one for the base latitude and one for the base longitude. After the searches are finished, they display a Toast on the phone and log to the Android Monitor the location of the rebel base on a certain planet or moon.
+In PlanetConsumer's MainActivity, take a look at the method <code>hackToFindRebelBaseWithQuery()</code>. Inside are two searches: one for the base latitude and one for the base longitude. After the searches are finished, they display a Toast on the phone and enter a Logcat log with the location of the rebel base on a certain planet or moon.
 
 To try it out, find the <code>// TODO</code> inside the <code>onClick()</code> method connected to the Button. Replace the <code>// TODO</code> with a call to <code>hackToFindRebelBaseWithQuery()</code>
 
@@ -144,7 +145,7 @@ button.setOnClickListener(View.OnClickListener {
 })
 </pre>
 
-<img src="https://www.raywenderlich.com/wp-content/uploads/2016/05/Screenshot_20160510-134754-281x500.png" alt="Screenshot_20160510-134754" width="281" height="500" class="aligncenter size-large wp-image-134008" />
+<img src="https://koenig-media.raywenderlich.com/uploads/2021/05/Screenshot_1621317087.png" alt="Screenshot_1621317087" width="281" height="500" class="aligncenter size-large wp-image-134008" />
 
 <h2>Manifest Permissions</h2>
 
@@ -168,7 +169,7 @@ It's not required, but a good practice to include the namespace for your app in 
 
 The permission you just added allows both reading and writing with your content provider. Without it, interactions with the provider are blocked.
 
-To see this in action, Build and Run PlanetProvider to load an APK with the updated Manifest to your device. Then, Build and Run PlanetConsumer. Your app will crash as soon as it tries to read the planet names, and a check of the Android Monitor gives the message:
+To see this in action, Build and Run PlanetProvider to load an APK with the updated Manifest to your device. Then, Build and Run PlanetConsumer. Your app will crash as soon as it tries to read the planet names, and a check in the Logcat tab gives the message:
 
 <pre lang="java">
 java.lang.SecurityException: Permission Denial: opening provider com.razeware.planetprovider.PlanetContentProvider from ... requires com.razeware.planetprovider.NAMES or com.razeware.planetprovider.NAMES
@@ -338,7 +339,8 @@ private fun refresh_name_table() {
         android.R.layout.simple_list_item_1,
         cursor,
         arrayOf("name"),
-        intArrayOf(android.R.id.text1)
+        intArrayOf(android.R.id.text1),
+        0
     )
   }
 }

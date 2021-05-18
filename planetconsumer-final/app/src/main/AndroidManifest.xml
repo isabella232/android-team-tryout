@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
   package="com.razeware.planetconsumer">
 
+  <queries>
+    <package android:name="com.razeware.planetprovider" />
+  </queries>
+
   <permission android:name="com.razeware.planetprovider.READ_NAMES"/>
   <uses-permission android:name="com.razeware.planetprovider.READ_NAMES"/>
   <uses-permission-sdk-23 android:name="com.razeware.planetprovider.READ_NAMES"/>
