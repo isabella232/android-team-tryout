@@ -4,7 +4,7 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
-import android.support.v7.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatActivity
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -50,7 +50,8 @@ class MainActivity : AppCompatActivity() {
           android.R.layout.simple_list_item_1,
           cursor,
           arrayOf("name"),
-          intArrayOf(android.R.id.text1)
+          intArrayOf(android.R.id.text1),
+          0
       )
     }
   }
@@ -67,7 +68,8 @@ class MainActivity : AppCompatActivity() {
         android.R.layout.simple_list_item_2,
         cursor,
         arrayOf("rebel_base_lat", "rebel_base_lng"),
-        intArrayOf(android.R.id.text1, android.R.id.text2)
+        intArrayOf(android.R.id.text1, android.R.id.text2),
+        0
     )
   }
 

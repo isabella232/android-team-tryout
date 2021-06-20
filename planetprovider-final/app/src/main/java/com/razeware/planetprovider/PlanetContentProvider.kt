@@ -6,8 +6,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.database.sqlite.SQLiteDatabase
 import android.content.UriMatcher
-
-
+import androidx.core.content.ContentProviderCompat
 
 
 class PlanetContentProvider : ContentProvider() {
@@ -31,7 +30,7 @@ class PlanetContentProvider : ContentProvider() {
   lateinit private var dbHelper: DBHelper
   lateinit private var db: SQLiteDatabase
 
-  override fun insert(p0: Uri?, p1: ContentValues?): Uri {
+  override fun insert(p0: Uri, p1: ContentValues?): Uri? {
     TODO("not implemented")
   }
 
@@ -47,19 +46,19 @@ class PlanetContentProvider : ContentProvider() {
   }
 
   override fun onCreate(): Boolean {
-    this.dbHelper = DBHelper(context)
+    this.dbHelper = DBHelper(ContentProviderCompat.requireContext(this))
     return true
   }
 
-  override fun update(p0: Uri?, p1: ContentValues?, p2: String?, p3: Array<out String>?): Int {
+  override fun update(p0: Uri, p1: ContentValues?, p2: String?, p3: Array<out String>?): Int {
     TODO("not implemented")
   }
 
-  override fun delete(p0: Uri?, p1: String?, p2: Array<out String>?): Int {
+  override fun delete(p0: Uri, p1: String?, p2: Array<out String>?): Int {
     TODO("not implemented")
   }
 
-  override fun getType(p0: Uri?): String {
+  override fun getType(p0: Uri): String {
     TODO("not implemented")
   }
 }
